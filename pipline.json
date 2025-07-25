@@ -1,0 +1,287 @@
+{
+    "name": "pipeline_main",
+    "properties": {
+        "activities": [
+            {
+                "name": "GetMetadata1",
+                "type": "GetMetadata",
+                "dependsOn": [],
+                "policy": {
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "dataset": {
+                        "referenceName": "ds_incoming",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_folder": "incoming"
+                        }
+                    },
+                    "fieldList": [
+                        "childItems"
+                    ],
+                    "storeSettings": {
+                        "type": "AzureBlobFSReadSettings",
+                        "enablePartitionDiscovery": false
+                    },
+                    "formatSettings": {
+                        "type": "DelimitedTextReadSettings"
+                    }
+                }
+            },
+            {
+                "name": "ForEach1",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('GetMetadata1').output.childItems",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "ExecuteChild",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "devices",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                {
+                                    "activity": "menu",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                {
+                                    "activity": "productmix",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                {
+                                    "activity": "tenderType",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                {
+                                    "activity": "transactions",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "pipeline_child",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": false,
+                                "parameters": {
+                                    "file_name": {
+                                        "value": "@replace(split(item().name, '_')[2], '.csv', '')",
+                                        "type": "Expression"
+                                    },
+                                    "file_date": {
+                                        "value": "@split(item().name, '_')[0]",
+                                        "type": "Expression"
+                                    },
+                                    "devices_last_run": {
+                                        "value": "@variables('devices')",
+                                        "type": "Expression"
+                                    },
+                                    "menu_last_run": {
+                                        "value": "@variables('menu')",
+                                        "type": "Expression"
+                                    },
+                                    "productmix_last_run": {
+                                        "value": "@variables('productmix')",
+                                        "type": "Expression"
+                                    },
+                                    "tenderType_last_run": {
+                                        "value": "@variables('tenderType')",
+                                        "type": "Expression"
+                                    },
+                                    "transactions_last_run": {
+                                        "value": "@variables('transactions')",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "devices",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "devices",
+                                "value": {
+                                    "value": "@activity('Lookup1').output.firstRow['devices']",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "menu",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "menu",
+                                "value": {
+                                    "value": "@activity('Lookup1').output.firstRow['menu']",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "productmix",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "productmix",
+                                "value": {
+                                    "value": "@activity('Lookup1').output.firstRow['productmix']",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "tenderType",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "tenderType",
+                                "value": {
+                                    "value": "@activity('Lookup1').output.firstRow['tenderType']",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "transactions",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "transactions",
+                                "value": {
+                                    "value": "@activity('Lookup1').output.firstRow['transactions']",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Lookup1",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "GetMetadata1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "wildcardFileName": "*",
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "ds_incoming",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_folder": "mylogs"
+                        }
+                    }
+                }
+            }
+        ],
+        "variables": {
+            "devices": {
+                "type": "String"
+            },
+            "menu": {
+                "type": "String"
+            },
+            "productmix": {
+                "type": "String"
+            },
+            "tenderType": {
+                "type": "String"
+            },
+            "transactions": {
+                "type": "String"
+            },
+            "devices_fileName": {
+                "type": "String"
+            },
+            "menu_fileName": {
+                "type": "String"
+            }
+        },
+        "annotations": []
+    }
+}
