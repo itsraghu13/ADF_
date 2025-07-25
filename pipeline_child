@@ -1,0 +1,367 @@
+{
+    "name": "pipeline_child",
+    "properties": {
+        "activities": [
+            {
+                "name": "Set file_name",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "file_name",
+                    "value": {
+                        "value": "@pipeline().parameters.file_name",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Set file_date",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Set file_name",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "file_date",
+                    "value": {
+                        "value": "@pipeline().parameters.file_date",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "IfCompareDate",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup1",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@if(\n    equals(pipeline().parameters.file_name, 'devices'),\n    greater(int(pipeline().parameters.file_date), int(pipeline().parameters.devices_last_run)),\n    if(\n        equals(pipeline().parameters.file_name, 'menu'),\n        greater(int(pipeline().parameters.file_date), int(pipeline().parameters.menu_last_run)),\n        if(\n            equals(pipeline().parameters.file_name, 'productmix'),\n            greater(int(pipeline().parameters.file_date), int(pipeline().parameters.productmix_last_run)),\n            if(\n                equals(pipeline().parameters.file_name, 'tenderType'),\n                greater(int(pipeline().parameters.file_date), int(pipeline().parameters.tenderType_last_run)),\n                if(\n                    equals(pipeline().parameters.file_name, 'transactions'),\n                    greater(int(pipeline().parameters.file_date), int(pipeline().parameters.transactions_last_run)),\n                    false\n                )\n            )\n        )\n    )\n)\n",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Copy To Destination",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "DelimitedTextSource",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSReadSettings",
+                                        "recursive": true,
+                                        "wildcardFileName": {
+                                            "value": "@concat(variables('file_date'),'_gh_',variables('file_name'),'.csv')",
+                                            "type": "Expression"
+                                        },
+                                        "enablePartitionDiscovery": false
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextReadSettings"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "ds_incoming",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "source_folder": "incoming"
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "ds_incoming",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "source_folder": "output"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update Logs",
+                            "type": "Copy",
+                            "dependsOn": [
+                                {
+                                    "activity": "Copy To Destination",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "DelimitedTextSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "devices_updated",
+                                            "value": {
+                                                "value": "@if(equals(variables('file_name'),'devices'),pipeline().parameters.file_date,activity('Lookup1').output.firstRow['devices'])",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "menu_updated",
+                                            "value": {
+                                                "value": "@if(equals(variables('file_name'),'menu'),pipeline().parameters.file_date,activity('Lookup1').output.firstRow['menu'])",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "productmix_updated",
+                                            "value": {
+                                                "value": "@if(equals(variables('file_name'),'productmix'),pipeline().parameters.file_date,activity('Lookup1').output.firstRow['productmix'])",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "tenderType_updated",
+                                            "value": {
+                                                "value": "@if(equals(variables('file_name'),'tenderType'),pipeline().parameters.file_date,activity('Lookup1').output.firstRow['tenderType'])",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "transactions_updated",
+                                            "value": {
+                                                "value": "@if(equals(variables('file_name'),'transactions'),pipeline().parameters.file_date,activity('Lookup1').output.firstRow['transactions'])",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ],
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSReadSettings",
+                                        "recursive": true,
+                                        "wildcardFileName": "*",
+                                        "enablePartitionDiscovery": false
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextReadSettings"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings",
+                                        "copyBehavior": "PreserveHierarchy"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                        {
+                                            "source": {
+                                                "name": "devices_updated",
+                                                "type": "String"
+                                            },
+                                            "sink": {
+                                                "name": "devices"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "name": "menu_updated",
+                                                "type": "String"
+                                            },
+                                            "sink": {
+                                                "name": "menu"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "name": "productmix_updated",
+                                                "type": "String"
+                                            },
+                                            "sink": {
+                                                "name": "productmix"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "name": "tenderType_updated",
+                                                "type": "String"
+                                            },
+                                            "sink": {
+                                                "name": "tenderType"
+                                            }
+                                        },
+                                        {
+                                            "source": {
+                                                "name": "transactions_updated",
+                                                "type": "String"
+                                            },
+                                            "sink": {
+                                                "name": "transactions"
+                                            }
+                                        }
+                                    ],
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "ds_incoming",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "source_folder": "mylogs"
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "ds_incoming",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "source_folder": "mylogs"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Lookup1",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "Set file_date",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "wildcardFileName": "*",
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "ds_incoming",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_folder": "mylogs"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "file_name": {
+                "type": "String"
+            },
+            "file_date": {
+                "type": "String"
+            },
+            "devices_last_run": {
+                "type": "string"
+            },
+            "menu_last_run": {
+                "type": "string"
+            },
+            "productmix_last_run": {
+                "type": "string"
+            },
+            "tenderType_last_run": {
+                "type": "string"
+            },
+            "transactions_last_run": {
+                "type": "string"
+            }
+        },
+        "variables": {
+            "file_name": {
+                "type": "String"
+            },
+            "file_date": {
+                "type": "String"
+            }
+        },
+        "annotations": []
+    }
+}
