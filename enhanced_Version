@@ -1,0 +1,72 @@
+graph LR
+    %% --- STYLE DEFINITIONS (Strictly from your Palette) ---
+    classDef source fill:#2B1F17,stroke:#2B1F17,stroke-width:2px,color:#fff;
+    classDef control fill:#002060,stroke:#002060,stroke-width:2px,color:#fff;
+    classDef storage fill:#0070C0,stroke:#0070C0,stroke-width:2px,color:#fff;
+    classDef compute fill:#204A32,stroke:#204A32,stroke-width:2px,color:#fff;
+
+    %% --- 1. SOURCES ---
+    subgraph Sources ["1. Source Systems (Legacy)"]
+        direction TB
+        S_ERP[("ERP / SAP")]:::source
+        S_DB[("SQL Databases")]:::source
+        S_API[("External APIs")]:::source
+    end
+
+    %% --- 2. CONTROL PLANE ---
+    subgraph Control ["2. Control & Security Plane"]
+        direction TB
+        
+        SQL[("Azure SQL DB<br/>(Metadata & Logs)")]:::control
+        AKV[("Azure Key Vault<br/>(Secret Management)")]:::control
+
+        subgraph ADF ["Azure Data Factory"]
+            Lookup[/"Lookup<br/>(Get Config)"/]:::control
+            
+            subgraph Loop ["Parallel ForEach Loop"]
+                GetSecret[/"Get Secrets<br/>(Key Vault)"/]:::control
+                Copy["Copy Activity<br/>(Source → Raw)"]:::control
+                Log["Stored Proc<br/>(Write Log to SQL)"]:::control
+            end
+            
+            Trigger["Trigger Processing"]:::control
+        end
+    end
+
+    %% --- 3. PLATFORM ---
+    subgraph Platform ["3. Modern Data Platform"]
+        direction TB
+        
+        ADB["Azure Databricks<br/>(Auto Loader Engine)"]:::compute
+
+        subgraph Lake ["Data Lake Storage Gen2"]
+            Raw[("RAW ZONE<br/>(Partitioned: YYYY/MM/DD)")]:::storage
+            Bronze[("BRONZE<br/>(Delta / Append-Only)")]:::storage
+            Silver[("SILVER<br/>(Delta / Upsert)")]:::storage
+            Gold[("GOLD<br/>(Delta / Aggregated)")]:::storage
+        end
+    end
+
+    %% --- CONNECTIONS ---
+    %% Control Flow
+    SQL <-->|"1. Read Config / Write Logs"| Lookup
+    Lookup --> Loop
+    Loop --> Trigger
+
+    %% Security Flow
+    GetSecret -.->|"2. Retrieve Passwords"| AKV
+    GetSecret --> Copy
+
+    %% Data Ingestion
+    Sources ==>|"3. Secure Ingest"| Copy
+    Copy -->|"4. Write Parquet"| Raw
+    Copy -->|"5. On Completion"| Log
+
+    %% Processing
+    Trigger -.->|"6. Execute Notebook"| ADB
+    
+    %% Auto Loader Flow
+    Raw -.->|"7. Auto Loader (Streaming Read)"| ADB
+    ADB ==>|"8. Efficient Append"| Bronze
+    ADB --"9. Merge"--> Silver
+    ADB --"10. Aggregate"--> Gold
